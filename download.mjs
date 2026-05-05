@@ -916,10 +916,12 @@ async function main() {
             const chapterFolder = path.join(outputRootFolder, `${chapterOrder} - ${sanitizeName(chapter.title || chapter.slug || 'chapter')}`);
             console.log(`📖 Chapter ${chapterIndex + 1}/${chapters.length}: ${paintBold(chapter.title || chapter.slug)}`);
 
-            const units = Array.isArray(chapter.unit_set) ? chapter.unit_set : [];
+            // Support both old API (unit_set) and new API (units)
+            const units = Array.isArray(chapter.units) ? chapter.units : (Array.isArray(chapter.unit_set) ? chapter.unit_set : []);
             for (let unitIndex = 0; unitIndex < units.length; unitIndex++) {
                 const unit = units[unitIndex];
-                if (!unit?.status) continue; // inactive
+                // Old API: skip if status is explicitly falsy; new API has no status field so skip this check
+                if ('status' in unit && !unit.status) continue; // inactive (old API)
                 if (unit?.type !== 'lecture') continue; // skip non-video units
                 totalUnits++;
                 const unitOrder = String(unitIndex + 1).padStart(2, '0');
@@ -931,7 +933,9 @@ async function main() {
                 verbose(`  🎬 Unit ${unitIndex + 1}/${units.length}: ${unit.title || unit.slug}`);
 
                 // Skip locked content or content requiring purchase
-                if (unit.locked) {
+                // Old API: unit.locked (boolean); New API: unit.view_access (10=free, 20=enrolled, 30=purchased, 40=subscription)
+                const isLocked = unit.locked === true;
+                if (isLocked) {
                     logWarn(`🔒 Locked/No access: ${finalFileName}`);
                     skippedCount++;
                     continue;
